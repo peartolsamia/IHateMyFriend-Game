@@ -8,21 +8,18 @@ public class PlateSpawner : NetworkBehaviour
     [SerializeField] private NetworkObject platePrefab;
 
     [Header("Spawn Noktalarý")]
-    [SerializeField] private Transform hostSpawnPoint;   // Alt (Host)
-    [SerializeField] private Transform clientSpawnPoint; // Üst (Client)
+    [SerializeField] private Transform hostSpawnPoint;   // Host için
+    [SerializeField] private Transform clientSpawnPoint; // Client(lar) için
 
-    // Ýsteðe baðlý: Transform kullanmak istemezsen Vector3 pozisyon kullan
-    [Header("Transform atamazsan bu pozisyonlar kullanýlýr")]
+    [Header("Transform atanmazsa fallback")]
     [SerializeField] private Vector3 fallbackHostPosition = new Vector3(0f, -15.5f, 0f);
     [SerializeField] private Vector3 fallbackClientPosition = new Vector3(0f, 15f, 0f);
 
-    // Hangi client için hangi plate'in spawn edildiðini tutar
-    private readonly Dictionary<ulong, NetworkObject> spawnedPlates = new Dictionary<ulong, NetworkObject>();
+    private readonly Dictionary<ulong, NetworkObject> spawnedPlates = new();
 
     private void OnEnable()
     {
         if (NetworkManager.Singleton == null) return;
-
         NetworkManager.Singleton.OnServerStarted += OnServerStarted;
         NetworkManager.Singleton.OnClientConnectedCallback += OnClientConnected;
         NetworkManager.Singleton.OnClientDisconnectCallback += OnClientDisconnected;
@@ -31,7 +28,6 @@ public class PlateSpawner : NetworkBehaviour
     private void OnDisable()
     {
         if (NetworkManager.Singleton == null) return;
-
         NetworkManager.Singleton.OnServerStarted -= OnServerStarted;
         NetworkManager.Singleton.OnClientConnectedCallback -= OnClientConnected;
         NetworkManager.Singleton.OnClientDisconnectCallback -= OnClientDisconnected;
@@ -41,57 +37,60 @@ public class PlateSpawner : NetworkBehaviour
     {
         if (!IsServer) return;
 
-        var hostId = NetworkManager.ServerClientId;  // düzeltildi
-        SpawnPlateForClient(
-            hostId,
-            hostSpawnPoint != null ? hostSpawnPoint.position : fallbackHostPosition,
-            hostSpawnPoint != null ? hostSpawnPoint.rotation : Quaternion.identity
-        );
+        var hostId = NetworkManager.ServerClientId;
+        var pos = hostSpawnPoint ? hostSpawnPoint.position : fallbackHostPosition;
+        var rot = hostSpawnPoint ? hostSpawnPoint.rotation : Quaternion.identity;
+        TrySpawnFor(hostId, pos, rot);
     }
 
     private void OnClientConnected(ulong clientId)
     {
         if (!IsServer) return;
+        if (clientId == NetworkManager.ServerClientId) return; // host zaten spawn edildi
 
-        if (clientId == NetworkManager.ServerClientId) return;  // düzeltildi
-
-        SpawnPlateForClient(
-            clientId,
-            clientSpawnPoint != null ? clientSpawnPoint.position : fallbackClientPosition,
-            clientSpawnPoint != null ? clientSpawnPoint.rotation : Quaternion.identity
-        );
+        var pos = clientSpawnPoint ? clientSpawnPoint.position : fallbackClientPosition;
+        var rot = clientSpawnPoint ? clientSpawnPoint.rotation : Quaternion.identity;
+        TrySpawnFor(clientId, pos, rot);
+        Debug.Log($"[PlateSpawner] Client baðlandý, plate spawn edildi -> clientId={clientId}");
     }
-
 
     private void OnClientDisconnected(ulong clientId)
     {
         if (!IsServer) return;
-
-        // Ayrýlan oyuncunun plate'ini temizle (isteðe baðlý)
-        if (spawnedPlates.TryGetValue(clientId, out var plate) && plate != null && plate.IsSpawned)
+        if (spawnedPlates.TryGetValue(clientId, out var plate) && plate && plate.IsSpawned)
         {
-            plate.Despawn(true); // true => server tarafýnda destroy et
+            plate.Despawn(true);
         }
         spawnedPlates.Remove(clientId);
     }
 
-    private void SpawnPlateForClient(ulong clientId, Vector3 position, Quaternion rotation)
+    private void TrySpawnFor(ulong clientId, Vector3 position, Quaternion rotation)
     {
-        if (platePrefab == null)
+        if (!IsServer) return;
+
+        if (!platePrefab)
         {
             Debug.LogError("[PlateSpawner] Plate Prefab atanmadý!");
             return;
         }
-
-        // Ayný client için ikinci kez spawn etmeyi engelle
         if (spawnedPlates.ContainsKey(clientId)) return;
 
-        var plateInstance = Instantiate(platePrefab, position, rotation);
+        // Prefab saðlama: root aktif ve NetworkObject + NetworkTransform enabled olmalý
+        if (!platePrefab.gameObject.activeSelf)
+            Debug.LogWarning("[PlateSpawner] Plate prefab root inactive! Aktif olduðundan emin ol.");
 
-        // Sahipliði ilgili client'a vererek spawn et
-        // (plate üzerinde hareket/scripts client owner'a göre çalýþabilir)
-        plateInstance.SpawnWithOwnership(clientId, true);
+        var instance = Instantiate(platePrefab, position, rotation);
 
-        spawnedPlates[clientId] = plateInstance;
+        // Tüm NetworkBehaviour’ler enabled mý kontrol et
+        foreach (var nb in instance.GetComponentsInChildren<NetworkBehaviour>(true))
+        {
+            if (!nb.enabled || !nb.gameObject.activeInHierarchy)
+                Debug.LogWarning($"[PlateSpawner] Spawn edilen plate içinde disabled NetworkBehaviour var: {nb.GetType().Name}");
+        }
+
+        instance.SpawnWithOwnership(clientId, destroyWithScene: true);
+        spawnedPlates[clientId] = instance;
+
+        Debug.Log($"[PlateSpawner] Spawn OK -> owner={clientId} pos={position}");
     }
 }
