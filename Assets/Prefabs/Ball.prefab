@@ -12,6 +12,7 @@ GameObject:
   - component: {fileID: 5680177728180700858}
   - component: {fileID: -2064936601299803008}
   - component: {fileID: 4943968686786715459}
+  - component: {fileID: 5826825974780795041}
   - component: {fileID: 8056538570612765612}
   - component: {fileID: 2643046138811516452}
   - component: {fileID: 3393739537632062588}
@@ -122,6 +123,29 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   ShowTopMostFoldoutHeaderGroup: 1
   moveSpeed: 5
+--- !u!114 &5826825974780795041
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8772197227063755090}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7381ddb89bf5d7b4585610de9e24b1d7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  ShowTopMostFoldoutHeaderGroup: 1
+  rb: {fileID: 3393739537632062588}
+  midLine: {fileID: 0}
+  bandHalfHeight: 4
+  dirEpsilon: 0.01
+  BallSide:
+    m_InternalValue: 0
+  VertDir:
+    m_InternalValue: 0
+  InBand:
+    m_InternalValue: 0
 --- !u!212 &8056538570612765612
 SpriteRenderer:
   m_ObjectHideFlags: 0
