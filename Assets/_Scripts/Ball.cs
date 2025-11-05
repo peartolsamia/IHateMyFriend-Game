@@ -7,11 +7,13 @@ public class Ball : NetworkBehaviour
 
     private GameObject midLine;
 
+    
+
     void Start()
     {
         midLine = GameObject.Find("MiddleLine");
 
-        GetComponent<Rigidbody2D>().linearVelocity = Vector2.up * moveSpeed;
+        GetComponent<Rigidbody2D>().linearVelocity = Vector2.up * moveSpeed; // at start ball goes directly up (MIGHT BE CHANGED)
     }
 
     float hitFactor(Vector2 ballPos, Vector2 platePos, float plateHeight)

@@ -8,8 +8,8 @@ public class PlateSpawner : NetworkBehaviour
     [SerializeField] private NetworkObject platePrefab;
 
     [Header("Spawn Noktalarý")]
-    [SerializeField] private Transform hostSpawnPoint;   // Host için
-    [SerializeField] private Transform clientSpawnPoint; // Client(lar) için
+    [SerializeField] private Transform hostSpawnPoint;   
+    [SerializeField] private Transform clientSpawnPoint; 
 
     [Header("Transform atanmazsa fallback")]
     [SerializeField] private Vector3 fallbackHostPosition = new Vector3(0f, -15.5f, 0f);
@@ -46,7 +46,7 @@ public class PlateSpawner : NetworkBehaviour
     private void OnClientConnected(ulong clientId)
     {
         if (!IsServer) return;
-        if (clientId == NetworkManager.ServerClientId) return; // host zaten spawn edildi
+        if (clientId == NetworkManager.ServerClientId) return;
 
         var pos = clientSpawnPoint ? clientSpawnPoint.position : fallbackClientPosition;
         var rot = clientSpawnPoint ? clientSpawnPoint.rotation : Quaternion.identity;
@@ -75,13 +75,13 @@ public class PlateSpawner : NetworkBehaviour
         }
         if (spawnedPlates.ContainsKey(clientId)) return;
 
-        // Prefab saðlama: root aktif ve NetworkObject + NetworkTransform enabled olmalý
+        
         if (!platePrefab.gameObject.activeSelf)
             Debug.LogWarning("[PlateSpawner] Plate prefab root inactive! Aktif olduðundan emin ol.");
 
         var instance = Instantiate(platePrefab, position, rotation);
 
-        // Tüm NetworkBehaviour’ler enabled mý kontrol et
+        
         foreach (var nb in instance.GetComponentsInChildren<NetworkBehaviour>(true))
         {
             if (!nb.enabled || !nb.gameObject.activeInHierarchy)
