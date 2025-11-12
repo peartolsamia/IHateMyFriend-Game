@@ -13,6 +13,7 @@ GameObject:
   - component: {fileID: -2064936601299803008}
   - component: {fileID: 4943968686786715459}
   - component: {fileID: 5826825974780795041}
+  - component: {fileID: 422533257963004598}
   - component: {fileID: 8056538570612765612}
   - component: {fileID: 2643046138811516452}
   - component: {fileID: 3393739537632062588}
@@ -137,7 +138,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   ShowTopMostFoldoutHeaderGroup: 1
   rb: {fileID: 3393739537632062588}
-  midLine: {fileID: 0}
   bandHalfHeight: 4
   dirEpsilon: 0.01
   BallSide:
@@ -146,6 +146,20 @@ MonoBehaviour:
     m_InternalValue: 0
   InBand:
     m_InternalValue: 0
+--- !u!114 &422533257963004598
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8772197227063755090}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b615241d01a712543a4fde91f861e982, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  ShowTopMostFoldoutHeaderGroup: 1
+  moveSpeed: 5
 --- !u!212 &8056538570612765612
 SpriteRenderer:
   m_ObjectHideFlags: 0
@@ -191,7 +205,7 @@ SpriteRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 0
   m_Sprite: {fileID: -2413806693520163455, guid: a86470a33a6bf42c4b3595704624658b, type: 3}
-  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_Color: {r: 0.72156864, g: 0.7607843, b: 0.7254902, a: 1}
   m_FlipX: 0
   m_FlipY: 0
   m_DrawMode: 0

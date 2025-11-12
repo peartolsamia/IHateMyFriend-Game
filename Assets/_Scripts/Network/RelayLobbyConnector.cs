@@ -1,5 +1,4 @@
-﻿// RelayLobbyConnector.cs (UTP "uzun parametreli" sürüm)
-using UnityEngine;
+﻿using UnityEngine;
 using Unity.Netcode;
 using Unity.Netcode.Transports.UTP;
 
@@ -12,12 +11,15 @@ using Unity.Networking.Transport.Relay;
 using System.Collections;
 using System.Threading.Tasks;
 
-// Çakışmaları önlemek için alias
+
 using Debug = UnityEngine.Debug;
 using Application = UnityEngine.Application;
 
+
 public class RelayLobbyConnector : MonoBehaviour
 {
+    static readonly System.Text.RegularExpressions.Regex s_joinCodeRx = new System.Text.RegularExpressions.Regex("^[6789BCDFGHJKLMNPQRTWbcdfghjklmnpqrtw]{6,12}$");
+
     [Header("UI")]
     public TMPro.TMP_InputField joinCodeInput;
     public TMPro.TMP_Text joinCodeText;
@@ -28,6 +30,8 @@ public class RelayLobbyConnector : MonoBehaviour
 
     Lobby currentLobby;
     Coroutine heartbeatCo;
+
+    [SerializeField] GameObject lobbyUIRoot;
 
     void Awake()
     {
@@ -59,11 +63,20 @@ public class RelayLobbyConnector : MonoBehaviour
     public async void OnJoinButton()
     {
 
-        if (_busy) { Debug.LogWarning("[RLC] Meşgulken Join tekrar çağrıldı, yok sayıldı."); return; }
+        if (_busy) { Debug.LogWarning("[RLC] Meşgulken Join tekrar çağrıldı"); return; }
         _busy = true;
-        try {
-            var code = joinCodeInput ? joinCodeInput.text : "";
-            Debug.Log($"[RLC] OnJoinButton tetiklendi, code='{code}'");
+        try
+        {
+            var raw = joinCodeInput ? joinCodeInput.text : "";
+            var code = NormalizeJoinCode(raw);
+            Debug.Log($"[RLC] OnJoinButton, code='{code}'");
+
+            if (!IsValidJoinCode(code))
+            {
+                Debug.LogError("[Relay] Join code hatalı formatta. 6-12 uzunluk, sadece 6789BCDFGHJKLMNPQRTW karakterleri.");
+                return;
+            }
+
             await StartClientFlow(code);
         }
         finally { _busy = false; }
@@ -83,19 +96,16 @@ public class RelayLobbyConnector : MonoBehaviour
 
         try
         {
-            // 1) Relay allocation (2 oyuncu)
+            
             Allocation alloc = await RelayService.Instance.CreateAllocationAsync(2);
             Debug.Log($"Allocation OK: {alloc.AllocationId}");
 
-            // 2) Join code
+            
             string code = await RelayService.Instance.GetJoinCodeAsync(alloc.AllocationId);
             if (joinCodeText) joinCodeText.text = $"CODE: {code}";
             Debug.Log($"[Relay] Host code: {code}");
 
-            //var probe = await RelayService.Instance.JoinAllocationAsync(code);
-            //Debug.Log($"[Probe] Join code GEÇERLİ. ip={probe.RelayServer.IpV4}:{probe.RelayServer.Port}");
-
-            // 3) Lobby oluştur (kodu metadata'ya yaz)
+            
             currentLobby = await LobbyService.Instance.CreateLobbyAsync(
                 "PongRoom", 2,
                 new CreateLobbyOptions
@@ -106,10 +116,10 @@ public class RelayLobbyConnector : MonoBehaviour
                     }
                 });
 
-            // 4) Lobby heartbeat
+            
             heartbeatCo = StartCoroutine(LobbyHeartbeat());
 
-            // 5) UTP'yi Relay'e yönlendir (uzun parametreli overload)
+            
             var utp = (UnityTransport)NetworkManager.Singleton.NetworkConfig.NetworkTransport;
             utp.SetRelayServerData(
                 alloc.RelayServer.IpV4,
@@ -117,18 +127,17 @@ public class RelayLobbyConnector : MonoBehaviour
                 alloc.AllocationIdBytes,
                 alloc.Key,
                 alloc.ConnectionData,
-                alloc.ConnectionData, // host için hostConnectionData = kendi connectionData
-                false                  // DTLS (secure)
+                alloc.ConnectionData, 
+                false                 
             );
 
-            // 6) Host başlat
+            
             NetworkManager.Singleton.StartHost();
             Debug.Log("[NGO] Host started.");
         }
         catch (System.Exception e)
         {
             Debug.LogError($"[Relay] CreateAllocationAsync hata: {e.Message}\n{e}");
-            //Debug.LogError($"[Probe] Join code GEÇERSİZ! -> {e.Message}");
         }
     }
 
@@ -137,20 +146,17 @@ public class RelayLobbyConnector : MonoBehaviour
     {
         await UgsBootstrap.InitAsync();
 
-        if (string.IsNullOrWhiteSpace(code))
+        code = NormalizeJoinCode(code);
+        if (string.IsNullOrWhiteSpace(code) || !IsValidJoinCode(code))
         {
-            Debug.LogError("[Relay] Join code boş.");
+            Debug.LogError("[Relay] Join code boş/format dışı.");
             return;
         }
 
-        // 1) (opsiyonel) Lobby join
-        //try { await LobbyService.Instance.JoinLobbyByCodeAsync(code); }
-        //catch { Debug.LogWarning("[Lobby] Join opsiyoneldi, atlandı."); }
 
-        // 2) Relay join
         JoinAllocation joinAlloc = await RelayService.Instance.JoinAllocationAsync(code);
 
-        // 3) UTP'yi Relay'e yönlendir (UZUN PARAMETRELİ overload)
+
         var utp = (UnityTransport)NetworkManager.Singleton.NetworkConfig.NetworkTransport;
         utp.SetRelayServerData(
             joinAlloc.RelayServer.IpV4,
@@ -158,8 +164,8 @@ public class RelayLobbyConnector : MonoBehaviour
             joinAlloc.AllocationIdBytes,
             joinAlloc.Key,
             joinAlloc.ConnectionData,
-            joinAlloc.HostConnectionData, // host’tan gelen
-            false                           // DTLS (secure)
+            joinAlloc.HostConnectionData, 
+            false                           
         );
 
         NetworkManager.Singleton.StartClient();
@@ -181,7 +187,7 @@ public class RelayLobbyConnector : MonoBehaviour
         if (currentLobby != null)
         {
             try { await LobbyService.Instance.DeleteLobbyAsync(currentLobby.Id); }
-            catch { /* sessiz geç */ }
+            catch { }
         }
     }
 
@@ -215,5 +221,32 @@ public class RelayLobbyConnector : MonoBehaviour
         }
         finally { _busy = false; }
     }
+
+    void OnEnable()
+    {
+        if (GameStateManager.Instance)
+            GameStateManager.Instance.GameStarted.OnValueChanged += OnGameStartedChanged;
+    }
+    void OnDisable()
+    {
+        if (GameStateManager.Instance)
+            GameStateManager.Instance.GameStarted.OnValueChanged -= OnGameStartedChanged;
+    }
+    void OnGameStartedChanged(bool oldV, bool newV)
+    {
+        if (newV && lobbyUIRoot) lobbyUIRoot.SetActive(false);
+    }
+
+
+    
+    static string NormalizeJoinCode(string raw)
+    {
+        raw = (raw ?? "").Trim();             
+        raw = raw.Replace(" ", "");         
+        raw = raw.Replace("CODE:", "", System.StringComparison.OrdinalIgnoreCase); 
+        return raw.ToUpperInvariant();         
+    }
+
+    static bool IsValidJoinCode(string code) => s_joinCodeRx.IsMatch(code);
 
 }
